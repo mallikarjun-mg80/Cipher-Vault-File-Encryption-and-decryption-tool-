@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CipherVault — File Encryption Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #060b09;
+            --bg-raised: #0c1512;
+            --card: #0f1e19;
+            --border: #1a3329;
+            --border-glow: #00ff8840;
+            --fg: #e0f5eb;
+            --fg-muted: #6b9b87;
+            --accent: #00ff88;
+            --accent-dim: #00cc6a;
+            --danger: #ff4757;
+            --warning: #ffb800;
+            --success: #00ff88;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Animated grid background */
+        .grid-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image:
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 60px 60px;
+            opacity: 0.25;
+            animation: gridDrift 20s linear infinite;
+        }
+
+        @keyframes gridDrift {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(60px, 60px);
+            }
+        }
+
+        /* Floating glow orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: var(--accent);
+            top: -150px;
+            left: -100px;
+            animation: orbFloat1 15s ease-in-out infinite;
+        }
+
+        .orb-2 {
+            width: 400px;
+            height: 400px;
+            background: #00b8ff;
+            bottom: -100px;
+            right: -100px;
+            animation: orbFloat2 18s ease-in-out infinite;
+        }
+
+        .orb-3 {
+            width: 300px;
+            height: 300px;
+            background: var(--warning);
+            top: 50%;
+            left: 50%;
+            opacity: 0.06;
+            animation: orbFloat3 22s ease-in-out infinite;
+        }
+
+        @keyframes orbFloat1 {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate(80px, 60px) scale(1.1);
+            }
+        }
+
+        @keyframes orbFloat2 {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate(-60px, -80px) scale(1.15);
+            }
+        }
+
+        @keyframes orbFloat3 {
+
+            0%,
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            50% {
+                transform: translate(-40%, -60%) scale(1.2);
+            }
+        }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-zone::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, var(--accent) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .drop-zone.drag-over {
+            border-color: var(--accent);
+            box-shadow: 0 0 40px var(--border-glow), inset 0 0 40px rgba(0, 255, 136, 0.03);
+        }
+
+        .drop-zone.drag-over::before {
+            opacity: 0.05;
+        }
+
+        .drop-zone:hover {
+            border-color: var(--fg-muted);
+        }
+
+        /* Scan line animation on card */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .processing .scan-line {
+            opacity: 0.6;
+            animation: scanDown 1.5s ease-in-out infinite;
+        }
+
+        @keyframes scanDown {
+            0% {
+                top: 0;
+            }
+
+            100% {
+                top: 100%;
+            }
+        }
+
+        /* Progress bar */
+        .progress-track {
+            height: 4px;
+            background: var(--bg);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.15s ease;
+            box-shadow: 0 0 12px var(--accent);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+            color: var(--bg);
+            font-weight: 600;
+            padding: 12px 28px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 15px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 255, 136, 0.25);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--card);
+            color: var(--fg);
+            font-weight: 500;
+            padding: 12px 28px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            border-color: var(--fg-muted);
+            background: var(--bg-raised);
+        }
+
+        .btn-secondary:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #cc2233, var(--danger));
+            color: #fff;
+            font-weight: 600;
+            padding: 12px 28px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(255, 71, 87, 0.25);
+        }
+
+        .btn-danger:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Input */
+        .input-field {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            width: 100%;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .input-field:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+        }
+
+        .input-field::placeholder {
+            color: var(--fg-muted);
+            opacity: 0.5;
+        }
+
+        /* Toggle switch */
+        .toggle-group {
+            display: flex;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 14px 24px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 1;
+            user-select: none;
+        }
+
+        .toggle-btn.active {
+            color: var(--bg);
+        }
+
+        .toggle-btn:not(.active) {
+            color: var(--fg-muted);
+        }
+
+        .toggle-btn:not(.active):hover {
+            color: var(--fg);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            width: calc(50% - 3px);
+            border-radius: 9px;
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 0;
+        }
+
+        .toggle-slider.encrypt-mode {
+            background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+            transform: translateX(3px);
+        }
+
+        .toggle-slider.decrypt-mode {
+            background: linear-gradient(135deg, #cc6600, var(--warning));
+            transform: translateX(calc(100% + 3px));
+        }
+
+        /* File info card */
+        .file-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            animation: slideUp 0.35s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: toastIn 0.35s ease, toastOut 0.35s ease 3s forwards;
+            backdrop-filter: blur(12px);
+            max-width: 380px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .toast.success {
+            background: rgba(0, 255, 136, 0.12);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            color: var(--accent);
+        }
+
+        .toast.error {
+            background: rgba(255, 71, 87, 0.12);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            color: var(--danger);
+        }
+
+        .toast.info {
+            background: rgba(0, 184, 255, 0.12);
+            border: 1px solid rgba(0, 184, 255, 0.3);
+            color: #00b8ff;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateX(40px);
+            }
+        }
+
+        /* Strength meter */
+        .strength-bar {
+            height: 3px;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        /* Particle canvas */
+        #particleCanvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Lock icon animation */
+        .lock-icon {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .lock-icon.locked {
+            color: var(--accent);
+            filter: drop-shadow(0 0 12px rgba(0, 255, 136, 0.4));
+        }
+
+        .lock-icon.unlocked {
+            color: var(--warning);
+            filter: drop-shadow(0 0 12px rgba(255, 184, 0, 0.4));
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--fg-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .toggle-btn {
+                padding: 12px 16px;
+                font-size: 14px;
+            }
+
+            .btn-primary,
+            .btn-secondary,
+            .btn-danger {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Background layers -->
+    <div class="grid-bg"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Main content -->
+    <div class="relative z-10 min-h-screen flex flex-col">
+
+        <!-- Header -->
+        <header class="w-full px-6 py-5 flex items-center justify-between max-w-5xl mx-auto">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style="background: linear-gradient(135deg, var(--accent-dim), var(--accent));">
+                    <i class="fa-solid fa-shield-halved text-lg" style="color: var(--bg);"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight" style="color: var(--fg);">CipherVault</h1>
+                    <p class="text-xs" style="color: var(--fg-muted);">AES-256-GCM Encryption</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="mono text-xs px-3 py-1.5 rounded-lg"
+                    style="background: var(--card); border: 1px solid var(--border); color: var(--fg-muted);">
+                    <i class="fa-solid fa-lock text-xs mr-1" style="color: var(--accent);"></i>
+                    Local Only
+                </span>
+            </div>
+        </header>
+
+        <!-- Main area -->
+        <main class="flex-1 flex items-start justify-center px-4 pb-12 pt-2">
+            <div class="w-full max-w-2xl">
+
+                <!-- Mode Toggle -->
+                <div class="toggle-group mb-6" id="modeToggle">
+                    <div class="toggle-slider encrypt-mode" id="toggleSlider"></div>
+                    <div class="toggle-btn active" id="encryptBtn" onclick="setMode('encrypt')">
+                        <i class="fa-solid fa-lock mr-2"></i>Encrypt
+                    </div>
+                    <div class="toggle-btn" id="decryptBtn" onclick="setMode('decrypt')">
+                        <i class="fa-solid fa-lock-open mr-2"></i>Decrypt
+                    </div>
+                </div>
+
+                <!-- Main Card -->
+                <div class="file-card relative" id="mainCard">
+                    <div class="scan-line"></div>
+
+                    <!-- Drop Zone -->
+                    <div class="drop-zone rounded-xl p-10 text-center cursor-pointer mb-5" id="dropZone"
+                        onclick="document.getElementById('fileInput').click()">
+                        <input type="file" id="fileInput" class="hidden" onchange="handleFileSelect(event)">
+                        <div id="dropContent">
+                            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+                                style="background: var(--bg); border: 1px solid var(--border);">
+                                <i class="fa-solid fa-cloud-arrow-up text-2xl" style="color: var(--fg-muted);"></i>
+                            </div>
+                            <p class="font-semibold text-base mb-1" style="color: var(--fg);">Drop your file here</p>
+                            <p class="text-sm" style="color: var(--fg-muted);">or click to browse — any file type, any
+                                size</p>
+                        </div>
+                        <!-- File info (shown after selection) -->
+                        <div id="fileInfo" class="hidden">
+                            <div class="flex items-center gap-4 text-left">
+                                <div class="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                                    id="fileIcon" style="background: var(--bg); border: 1px solid var(--border);">
+                                    <i class="fa-solid fa-file text-xl" style="color: var(--fg-muted);"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-semibold text-sm truncate" id="fileName" style="color: var(--fg);">
+                                    </p>
+                                    <p class="text-xs mt-0.5 mono" id="fileSize" style="color: var(--fg-muted);"></p>
+                                    <p class="text-xs mt-0.5 mono" id="fileType" style="color: var(--fg-muted);"></p>
+                                </div>
+                                <button onclick="event.stopPropagation(); clearFile();"
+                                    class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-500/10 transition-colors"
+                                    style="color: var(--danger);" aria-label="Remove file">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="mb-4">
+                        <label class="block text-xs font-semibold mb-2 uppercase tracking-wider"
+                            style="color: var(--fg-muted);" id="passwordLabel">Encryption Password</label>
+                        <div class="relative">
+                            <input type="password" class="input-field pr-12" id="passwordInput"
+                                placeholder="Enter a strong password..." oninput="updateStrength()" autocomplete="off">
+                            <button onclick="togglePasswordVisibility()"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors"
+                                style="color: var(--fg-muted);" aria-label="Toggle password visibility">
+                                <i class="fa-solid fa-eye text-sm" id="eyeIcon"></i>
+                            </button>
+                        </div>
+                        <!-- Strength meter -->
+                        <div class="mt-2 flex gap-1.5" id="strengthMeter">
+                            <div class="strength-bar flex-1 rounded" style="background: var(--border);"></div>
+                            <div class="strength-bar flex-1 rounded" style="background: var(--border);"></div>
+                            <div class="strength-bar flex-1 rounded" style="background: var(--border);"></div>
+                            <div class="strength-bar flex-1 rounded" style="background: var(--border);"></div>
+                        </div>
+                        <p class="text-xs mt-1.5" id="strengthText" style="color: var(--fg-muted);"></p>
+                    </div>
+
+                    <!-- Confirm password (encrypt mode only) -->
+                    <div class="mb-5" id="confirmSection">
+                        <label class="block text-xs font-semibold mb-2 uppercase tracking-wider"
+                            style="color: var(--fg-muted);">Confirm Password</label>
+                        <input type="password" class="input-field" id="confirmInput"
+                            placeholder="Re-enter your password..." autocomplete="off">
+                        <p class="text-xs mt-1.5 hidden" id="matchError" style="color: var(--danger);"><i
+                                class="fa-solid fa-triangle-exclamation mr-1"></i>Passwords do not match</p>
+                    </div>
+
+                    <!-- Progress -->
+                    <div class="mb-4 hidden" id="progressSection">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-medium" style="color: var(--fg-muted);"
+                                id="progressLabel">Processing...</span>
+                            <span class="text-xs mono" style="color: var(--accent);" id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3" id="actionButtons">
+                        <button class="btn-primary flex-1 flex items-center justify-center gap-2" id="processBtn"
+                            onclick="processFile()" disabled>
+                            <i class="fa-solid fa-lock" id="processIcon"></i>
+                            <span id="processText">Encrypt File</span>
+                        </button>
+                        <button class="btn-secondary" id="clearBtn" onclick="resetAll()" disabled>
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+
+                    <!-- Download section (shown after processing) -->
+                    <div class="hidden mt-5 pt-5" id="downloadSection" style="border-top: 1px solid var(--border);">
+                        <div class="flex items-center gap-3 mb-3">
+                            <i class="fa-solid fa-circle-check" style="color: var(--accent);"></i>
+                            <span class="text-sm font-medium" id="resultMessage" style="color: var(--accent);"></span>
+                        </div>
+                        <div class="flex gap-3">
+                            <button class="btn-primary flex-1 flex items-center justify-center gap-2" id="downloadBtn"
+                                onclick="downloadResult()">
+                                <i class="fa-solid fa-download"></i>
+                                <span id="downloadText">Download Encrypted File</span>
+                            </button>
+                            <button class="btn-secondary" onclick="resetAll()">
+                                <i class="fa-solid fa-plus"></i> New
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+                    <div class="rounded-xl p-4" style="background: var(--card); border: 1px solid var(--border);">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
+                            style="background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.15);">
+                            <i class="fa-solid fa-microchip text-sm" style="color: var(--accent);"></i>
+                        </div>
+                        <p class="text-sm font-semibold mb-0.5">AES-256-GCM</p>
+                        <p class="text-xs" style="color: var(--fg-muted);">Military-grade symmetric encryption with
+                            authenticated data</p>
+                    </div>
+                    <div class="rounded-xl p-4" style="background: var(--card); border: 1px solid var(--border);">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
+                            style="background: rgba(0,184,255,0.08); border: 1px solid rgba(0,184,255,0.15);">
+                            <i class="fa-solid fa-key text-sm" style="color: #00b8ff;"></i>
+                        </div>
+                        <p class="text-sm font-semibold mb-0.5">PBKDF2 Key Derivation</p>
+                        <p class="text-xs" style="color: var(--fg-muted);">600,000 iterations with random salt — resists
+                            brute force</p>
+                    </div>
+                    <div class="rounded-xl p-4" style="background: var(--card); border: 1px solid var(--border);">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
+                            style="background: rgba(255,184,0,0.08); border: 1px solid rgba(255,184,0,0.15);">
+                            <i class="fa-solid fa-wifi-strong text-sm" style="color: var(--warning);"></i>
+                        </div>
+                        <p class="text-sm font-semibold mb-0.5">Zero Network Calls</p>
+                        <p class="text-xs" style="color: var(--fg-muted);">All processing happens locally — your files
+                            never leave this device</p>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <footer class="mt-8 text-center pb-4">
+                    <p class="text-xs" style="color: var(--fg-muted);">
+                        Built with Web Crypto API — No server, no tracking, no dependencies.
+                        <br>Remember your password. If lost, the file is irrecoverable.
+                    </p>
+                </footer>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ─── State ───
+        let currentMode = 'encrypt'; // 'encrypt' | 'decrypt'
+        let selectedFile = null;
+        let resultBlob = null;
+        let resultFilename = '';
+
+        // ─── Particle Background ───
+        (function initParticles() {
+            const canvas = document.getElementById('particleCanvas');
+            const ctx = canvas.getContext('2d');
+            let particles = [];
+            const PARTICLE_COUNT = 50;
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resize();
+            window.addEventListener('resize', resize);
+
+            // Check reduced motion preference
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (prefersReducedMotion) return;
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 0.3,
+                    vy: (Math.random() - 0.5) * 0.3,
+                    r: Math.random() * 1.5 + 0.5,
+                    alpha: Math.random() * 0.3 + 0.05
+                });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (const p of particles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    if (p.x < 0) p.x = canvas.width;
+                    if (p.x > canvas.width) p.x = 0;
+                    if (p.y < 0) p.y = canvas.height;
+                    if (p.y > canvas.height) p.y = 0;
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, Math.max(0.5, p.r), 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(0, 255, 136, ${p.alpha})`;
+                    ctx.fill();
+                }
+
+                // Draw faint connections
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 150) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(0, 255, 136, ${0.03 * (1 - dist / 150)})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                        }
+                    }
+                }
+                requestAnimationFrame(animate);
+            }
+            animate();
+        })();
+
+        // ─── Mode Toggle ───
+        function setMode(mode) {
+            currentMode = mode;
+            const slider = document.getElementById('toggleSlider');
+            const encBtn = document.getElementById('encryptBtn');
+            const decBtn = document.getElementById('decryptBtn');
+            const confirmSection = document.getElementById('confirmSection');
+            const passwordLabel = document.getElementById('passwordLabel');
+            const processIcon = document.getElementById('processIcon');
+            const processText = document.getElementById('processText');
+
+            if (mode === 'encrypt') {
+                slider.className = 'toggle-slider encrypt-mode';
+                encBtn.classList.add('active');
+                decBtn.classList.remove('active');
+                confirmSection.style.display = '';
+                passwordLabel.textContent = 'Encryption Password';
+                processIcon.className = 'fa-solid fa-lock';
+                processText.textContent = 'Encrypt File';
+            } else {
+                slider.className = 'toggle-slider decrypt-mode';
+                decBtn.classList.add('active');
+                encBtn.classList.remove('active');
+                confirmSection.style.display = 'none';
+                passwordLabel.textContent = 'Decryption Password';
+                processIcon.className = 'fa-solid fa-lock-open';
+                processText.textContent = 'Decrypt File';
+            }
+
+            updateProcessButton();
+        }
+
+        // ─── Drag & Drop ───
+        const dropZone = document.getElementById('dropZone');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                loadFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            if (event.target.files.length > 0) {
+                loadFile(event.target.files[0]);
+            }
+        }
+
+        function loadFile(file) {
+            selectedFile = file;
+            resultBlob = null;
+
+            // Update UI
+            document.getElementById('dropContent').classList.add('hidden');
+            document.getElementById('fileInfo').classList.remove('hidden');
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatSize(file.size);
+            document.getElementById('fileType').textContent = file.type || 'Unknown type';
+
+            // Set appropriate icon
+            const icon = document.getElementById('fileIcon').querySelector('i');
+            icon.className = getFileIcon(file.name);
+
+            // Hide download section if showing
+            document.getElementById('downloadSection').classList.add('hidden');
+            document.getElementById('actionButtons').classList.remove('hidden');
+
+            updateProcessButton();
+            document.getElementById('clearBtn').disabled = false;
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            resultBlob = null;
+            document.getElementById('dropContent').classList.remove('hidden');
+            document.getElementById('fileInfo').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+            document.getElementById('downloadSection').classList.add('hidden');
+            document.getElementById('actionButtons').classList.remove('hidden');
+            document.getElementById('clearBtn').disabled = true;
+            updateProcessButton();
+        }
+
+        function resetAll() {
+            clearFile();
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('confirmInput').value = '';
+            document.getElementById('matchError').classList.add('hidden');
+            updateStrength();
+        }
+
+        // ─── Password Visibility ───
+        function togglePasswordVisibility() {
+            const input = document.getElementById('passwordInput');
+            const icon = document.getElementById('eyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash text-sm';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye text-sm';
+            }
+        }
+
+        // ─── Password Strength ───
+        function updateStrength() {
+            const password = document.getElementById('passwordInput').value;
+            const bars = document.getElementById('strengthMeter').children;
+            const text = document.getElementById('strengthText');
+
+            let score = 0;
+            if (password.length >= 8) score++;
+            if (password.length >= 12) score++;
+            if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+            if (/[0-9]/.test(password)) score++;
+            if (/[^A-Za-z0-9]/.test(password)) score++;
+            score = Math.min(4, score);
+
+            const colors = ['var(--danger)', 'var(--warning)', '#00b8ff', 'var(--accent)'];
+            const labels = ['Weak', 'Fair', 'Good', 'Strong'];
+
+            for (let i = 0; i < 4; i++) {
+                bars[i].style.background = i < score ? colors[Math.min(score - 1, 3)] : 'var(--border)';
+                bars[i].style.transition = 'background 0.3s ease';
+            }
+
+            if (password.length === 0) {
+                text.textContent = '';
+            } else {
+                text.textContent = labels[Math.max(0, score - 1)] || 'Too short';
+                text.style.color = score > 0 ? colors[Math.min(score - 1, 3)] : 'var(--fg-muted)';
+            }
+
+            // Check match in encrypt mode
+            if (currentMode === 'encrypt') {
+                checkPasswordMatch();
+            }
+
+            updateProcessButton();
+        }
+
+        function checkPasswordMatch() {
+            const pass = document.getElementById('passwordInput').value;
+            const confirm = document.getElementById('confirmInput').value;
+            const err = document.getElementById('matchError');
+            if (confirm.length > 0 && pass !== confirm) {
+                err.classList.remove('hidden');
+            } else {
+                err.classList.add('hidden');
+            }
+            updateProcessButton();
+        }
+
+        // Listen to confirm input
+        document.getElementById('confirmInput').addEventListener('input', checkPasswordMatch);
+
+        // ─── Enable/Disable Process Button ───
+        function updateProcessButton() {
+            const btn = document.getElementById('processBtn');
+            const pass = document.getElementById('passwordInput').value;
+            const confirm = document.getElementById('confirmInput').value;
+            const errVisible = !document.getElementById('matchError').classList.contains('hidden');
+
+            let canProcess = selectedFile && pass.length >= 4;
+            if (currentMode === 'encrypt') {
+                canProcess = canProcess && pass === confirm && !errVisible;
+            }
+            btn.disabled = !canProcess;
+        }
+
+        // ─── Crypto Functions ───
+
+        /**
+         * Derive an AES-256-GCM key from a password and salt using PBKDF2.
+         */
+        async function deriveKey(password, salt) {
+            const encoder = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode(password),
+                'PBKDF2',
+                false,
+                ['deriveKey']
+            );
+            return crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: 600000,
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        /**
+         * Encrypt file data with a password.
+         * Output format: [salt (16 bytes)] [iv (12 bytes)] [ciphertext + auth tag]
+         */
+        async function encryptData(data, password, onProgress) {
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const key = await deriveKey(password, salt);
+
+            onProgress(20);
+
+            const encrypted = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: iv },
+                key,
+                data
+            );
+
+            onProgress(90);
+
+            // Combine salt + iv + ciphertext
+            const result = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+            result.set(salt, 0);
+            result.set(iv, salt.length);
+            result.set(new Uint8Array(encrypted), salt.length + iv.length);
+
+            onProgress(100);
+            return result;
+        }
+
+        /**
+         * Decrypt file data with a password.
+         * Expects format: [salt (16 bytes)] [iv (12 bytes)] [ciphertext + auth tag]
+         */
+        async function decryptData(data, password, onProgress) {
+            if (data.byteLength < 28) {
+                throw new Error('File is too small to be a valid encrypted file.');
+            }
+
+            const salt = data.slice(0, 16);
+            const iv = data.slice(16, 28);
+            const ciphertext = data.slice(28);
+
+            onProgress(30);
+
+            const key = await deriveKey(password, salt);
+
+            onProgress(60);
+
+            const decrypted = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: iv },
+                key,
+                ciphertext
+            );
+
+            onProgress(100);
+            return new Uint8Array(decrypted);
+        }
+
+        // ─── Process File ───
+        async function processFile() {
+            const password = document.getElementById('passwordInput').value;
+            if (!selectedFile || !password) return;
+
+            const processBtn = document.getElementById('processBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const progressSection = document.getElementById('progressSection');
+            const progressFill = document.getElementById('progressFill');
+            const progressPercent = document.getElementById('progressPercent');
+            const progressLabel = document.getElementById('progressLabel');
+            const mainCard = document.getElementById('mainCard');
+
+            // Disable buttons, show progress
+            processBtn.disabled = true;
+            clearBtn.disabled = true;
+            progressSection.classList.remove('hidden');
+            mainCard.classList.add('processing');
+
+            if (currentMode === 'encrypt') {
+                progressLabel.textContent = 'Encrypting...';
+            } else {
+                progressLabel.textContent = 'Deriving key...';
+            }
+
+            function setProgress(pct) {
+                const p = Math.min(100, Math.max(0, pct));
+                progressFill.style.width = p + '%';
+                progressPercent.textContent = Math.round(p) + '%';
+            }
+
+            setProgress(5);
+
+            try {
+                // Read file into ArrayBuffer
+                const fileBuffer = await readFileAsArrayBuffer(selectedFile);
+                setProgress(10);
+
+                let resultArray;
+                if (currentMode === 'encrypt') {
+                    resultArray = await encryptData(fileBuffer, password, setProgress);
+                    resultFilename = selectedFile.name + '.enc';
+                } else {
+                    resultArray = await decryptData(new Uint8Array(fileBuffer), password, setProgress);
+                    // Strip .enc extension if present, otherwise append .decrypted
+                    if (selectedFile.name.endsWith('.enc')) {
+                        resultFilename = selectedFile.name.slice(0, -4);
+                    } else {
+                        resultFilename = selectedFile.name + '.decrypted';
+                    }
+                }
+
+                resultBlob = new Blob([resultArray]);
+
+                // Show success
+                mainCard.classList.remove('processing');
+                progressSection.classList.add('hidden');
+                document.getElementById('actionButtons').classList.add('hidden');
+                document.getElementById('downloadSection').classList.remove('hidden');
+
+                const resultMsg = document.getElementById('resultMessage');
+                const downloadText = document.getElementById('downloadText');
+
+                if (currentMode === 'encrypt') {
+                    resultMsg.innerHTML = '<i class="fa-solid fa-shield-check mr-2"></i>File encrypted successfully';
+                    resultMsg.style.color = 'var(--accent)';
+                    downloadText.textContent = 'Download Encrypted File';
+                } else {
+                    resultMsg.innerHTML = '<i class="fa-solid fa-shield-check mr-2"></i>File decrypted successfully';
+                    resultMsg.style.color = 'var(--accent)';
+                    downloadText.textContent = 'Download Decrypted File';
+                }
+
+                showToast(currentMode === 'encrypt' ? 'File encrypted securely' : 'File decrypted successfully', 'success');
+
+            } catch (err) {
+                mainCard.classList.remove('processing');
+                progressSection.classList.add('hidden');
+                processBtn.disabled = false;
+                clearBtn.disabled = false;
+
+                if (currentMode === 'decrypt' && (err.name === 'OperationError' || err.message.includes('decrypt'))) {
+                    showToast('Decryption failed — wrong password or corrupted file', 'error');
+                } else {
+                    showToast('Error: ' + (err.message || 'Something went wrong'), 'error');
+                }
+                console.error(err);
+            }
+        }
+
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // ─── Download ───
+        function downloadResult() {
+            if (!resultBlob) return;
+            const url = URL.createObjectURL(resultBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = resultFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            showToast('Download started — ' + resultFilename, 'info');
+        }
+
+        // ─── Toast ───
+        function showToast(message, type) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+
+            const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', info: 'fa-circle-info' };
+            toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i><span>${message}</span>`;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                if (toast.parentNode) toast.parentNode.removeChild(toast);
+            }, 3500);
+        }
+
+        // ─── Helpers ───
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+        }
+
+        function getFileIcon(name) {
+            const ext = name.split('.').pop().toLowerCase();
+            const map = {
+                'pdf': 'fa-solid fa-file-pdf',
+                'doc': 'fa-solid fa-file-word', 'docx': 'fa-solid fa-file-word',
+                'xls': 'fa-solid fa-file-excel', 'xlsx': 'fa-solid fa-file-excel',
+                'ppt': 'fa-solid fa-file-powerpoint', 'pptx': 'fa-solid fa-file-powerpoint',
+                'jpg': 'fa-solid fa-file-image', 'jpeg': 'fa-solid fa-file-image',
+                'png': 'fa-solid fa-file-image', 'gif': 'fa-solid fa-file-image', 'webp': 'fa-solid fa-file-image', 'svg': 'fa-solid fa-file-image',
+                'mp4': 'fa-solid fa-file-video', 'mov': 'fa-solid fa-file-video', 'avi': 'fa-solid fa-file-video', 'mkv': 'fa-solid fa-file-video',
+                'mp3': 'fa-solid fa-file-audio', 'wav': 'fa-solid fa-file-audio', 'flac': 'fa-solid fa-file-audio', 'ogg': 'fa-solid fa-file-audio',
+                'zip': 'fa-solid fa-file-zipper', 'rar': 'fa-solid fa-file-zipper', '7z': 'fa-solid fa-file-zipper', 'tar': 'fa-solid fa-file-zipper', 'gz': 'fa-solid fa-file-zipper',
+                'js': 'fa-solid fa-file-code', 'ts': 'fa-solid fa-file-code', 'py': 'fa-solid fa-file-code',
+                'html': 'fa-solid fa-file-code', 'css': 'fa-solid fa-file-code', 'json': 'fa-solid fa-file-code',
+                'txt': 'fa-solid fa-file-lines', 'md': 'fa-solid fa-file-lines', 'csv': 'fa-solid fa-file-lines',
+                'enc': 'fa-solid fa-lock',
+            };
+            return map[ext] || 'fa-solid fa-file';
+        }
+
+        // ─── Keyboard Accessibility ───
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('processBtn').disabled) {
+                // Don't trigger if focus is in confirm input and passwords don't match
+                if (document.activeElement === document.getElementById('confirmInput')) {
+                    checkPasswordMatch();
+                    if (!document.getElementById('matchError').classList.contains('hidden')) return;
+                }
+                processFile();
+            }
+        });
+    </script>
+
+</body>
+
+</html>
